@@ -4,7 +4,7 @@ MoonWitch is a streamlined, terminal-based OSINT (Open Source Intelligence) fram
 
 ## Preview
 
-![MoonWitch Preview](preview.png)
+![MoonWitch Preview](preview1.png)
 
 ## Features
 
