@@ -1,132 +1,146 @@
-import os
 import sys
-import requests
-from colorama import init, Fore, Style
+import httpx
+import os
+import time
+from urllib.parse import quote
 
-init(autoreset=True)
+API_MAP = {
+    "01": ("Phone Number Lookup", "API_URL_NUM_HERE"),
+    "02": ("UPI Lookup", "API_URL_UPI_HERE"),
+    "03": ("Vehicle Lookup", "API_URL_VEHICLE_HERE"),
+    "04": ("TG Username Lookup", "API_URL_TG_HERE"),
+    "05": ("Aadhaar Lookup", "API_URL_AADHAAR_HERE")
+}
 
-API_URL = "https://your-api-endpoint.com/api/v1/"
-API_KEY = "YOUR_API_KEY_HERE"
+RED = '\033[31m'      
+W = '\033[97m'        
+R = '\033[0m'         
+BR = f"\033[1m{RED}"  
 
 def clear_screen():
     os.system('cls' if os.name == 'nt' else 'clear')
 
-def print_banner():
-    banner = f"""{Fore.MAGENTA}
-    __  __                   __        ___ _       _     
-   |  \/  | ___  ___  _ __   \ \      / (_) |_ ___| |__  
-   | |\/| |/ _ \/ _ \| '_ \   \ \ /\ / /| | __/ __| '_ \ 
-   | |  | | (_)| (_) | | | |   \ V  V / | | || (__| | | |
-   |_|  |_|\___/\___/|_| |_|    \_/\_/  |_|\__\___|_| |_|
-    {Style.RESET_ALL}
-            github.com/whosouvikkk
-    """
-    print(banner)
+def display_ui():
+    clear_screen()
+    ui = f"""{BR}
+ ███╗   ███╗ ██████╗  ██████╗ ███╗   ██╗██╗    ██╗██╗████████╗ ██████╗██╗  ██╗
+ ████╗ ████║██╔═══██╗██╔═══██╗████╗  ██║██║    ██║██║╚══██╔══╝██╔════╝██║  ██║
+ ██╔████╔██║██║   ██║██║   ██║██╔██╗ ██║██║ █╗ ██║██║   ██║   ██║     ███████║
+ ██║╚██╔╝██║██║   ██║██║   ██║██║╚██╗██║██║███╗██║██║   ██║   ██║     ██╔══██║
+ ██║ ╚═╝ ██║╚██████╔╝╚██████╔╝██║ ╚████║╚███╔███╔╝██║   ██║   ╚██████╗██║  ██║
+ ╚═╝     ╚═╝ ╚═════╝  ╚═════╝ ╚═╝  ╚═══╝ ╚══╝╚══╝ ╚═╝   ╚═╝    ╚═════╝╚═╝  ╚═╝
+                {W}https://t.me/moonwitchservices{R}
 
-def print_menu():
-    menu = f"""
-{Fore.MAGENTA}[H]{Style.RESET_ALL} Help
-{Fore.MAGENTA}[V]{Style.RESET_ALL} Version
-{Fore.MAGENTA}[S]{Style.RESET_ALL} Settings
+  {RED}[H]{W} Help          {RED}[V]{W} Version          {RED}[C]{W} Contact
 
-{Fore.MAGENTA}[MoonWitch Lookups]{Style.RESET_ALL}
+  {RED}[Osint Modules]{W}                             {RED}[System & Plugins]{W}
 
-{Fore.MAGENTA}[01]{Style.RESET_ALL} Phone Number Lookup      {Fore.MAGENTA}[05]{Style.RESET_ALL} TG Username Lookup
-{Fore.MAGENTA}[02]{Style.RESET_ALL} UPI Lookup               {Fore.MAGENTA}[06]{Style.RESET_ALL} Instagram Lookup
-{Fore.MAGENTA}[03]{Style.RESET_ALL} Vehicle Lookup           {Fore.MAGENTA}[07]{Style.RESET_ALL} Aadhaar Lookup
-{Fore.MAGENTA}[04]{Style.RESET_ALL} Location/IP Lookup       {Fore.MAGENTA}[08]{Style.RESET_ALL} PAN Lookup
+  {RED}[01]{W} Phone Number Lookup                   {RED}[00]{W} Exit System
+  {RED}[02]{W} UPI Lookup                            {RED}[..]{W} Update Tool
+  {RED}[03]{W} Vehicle Lookup           
+  {RED}[04]{W} TG Username Lookup
+  {RED}[05]{W} Aadhaar Lookup
+{R}"""
+    print(ui)
 
-{Fore.MAGENTA}[00]{Style.RESET_ALL} Exit
-"""
-    print(menu)
-
-def query_api(endpoint, query_param, query_value):
-    """
-    Handles API requests. Checks if the API is configured first.
-    Prints details line by line if successful.
-    """
-    print(f"\n{Fore.YELLOW}[*] Initializing search for: {query_value}...{Style.RESET_ALL}")
-    
-    if API_URL == "https://your-api-endpoint.com/api/v1/" or API_KEY == "YOUR_API_KEY_HERE":
-        print(f"\n{Fore.RED}[-] API is not provided or configured.{Style.RESET_ALL}")
-        print(f"{Fore.YELLOW}[!] Please update API_URL and API_KEY in the source code to view actual details.{Style.RESET_ALL}")
-        input(f"\n{Fore.MAGENTA}[Press Enter to return to menu...]{Style.RESET_ALL}")
-        return
-
-    headers = {
-        "Authorization": f"Bearer {API_KEY}",
-        "Content-Type": "application/json"
+def filter_and_format(data_dict):
+    """Filters out API metadata and prints results line by line cleanly."""
+    hidden_keys = {
+        "powered by", "api info", "key owner", "remaining", 
+        "dailyremaining", "limit", "used", "created", "expiry", 
+        "status", "success", "developer", "credit"
     }
     
-    params = {query_param: query_value}
+    print(f"\n{BR} ┌── Target Acquired {R}")
+    print(f"{BR} │ {R}")
     
-    try:
-        response = requests.get(f"{API_URL}{endpoint}", headers=headers, params=params)
+    for key, value in data_dict.items():
+        clean_key = str(key).replace('_', ' ').strip()
+        key_lower = clean_key.lower()
         
-        if response.status_code == 200:
-            data = response.json()
-            print(f"\n{Fore.GREEN}[+] Results Found:{Style.RESET_ALL}")
+        if key_lower in hidden_keys:
+            continue
             
-            for key, value in data.items():
-                print(f"    {Fore.MAGENTA}>{Style.RESET_ALL} {key.capitalize()}: {value}")
+        if isinstance(value, dict):
+            if key_lower == "api info":
+                continue
+            for sub_key, sub_val in value.items():
+                clean_sub_key = str(sub_key).replace('_', ' ').strip()
+                if clean_sub_key.lower() not in hidden_keys:
+                    print(f"{BR} ├─ {R}{clean_sub_key.title()}: {sub_val}")
+                    
+        elif isinstance(value, list):
+            for item in value:
+                if isinstance(item, dict):
+                    for list_key, list_val in item.items():
+                        clean_list_key = str(list_key).replace('_', ' ').strip()
+                        if clean_list_key.lower() not in hidden_keys:
+                            print(f"{BR} ├─ {R}{clean_list_key.title()}: {list_val}")
+                else:
+                    print(f"{BR} ├─ {R}{item}")
         else:
-            print(f"\n{Fore.RED}[-] Error {response.status_code}: {response.text}{Style.RESET_ALL}")
+            print(f"{BR} ├─ {R}{clean_key.title()}: {value}")
             
+    print(f"{BR} │ {R}")
+    print(f"{BR} └── End of Report ─────────────────────────────────────────{R}\n")
+
+def run_lookup(api_url, query):
+    try:
+        print(f"\n{RED}[*] Querying shadows for '{query}'...{R}")
+        with httpx.Client(timeout=30.0) as client:
+            resp = client.get(f"{api_url}{quote(query)}")
+            if resp.status_code == 200:
+                time.sleep(0.5) 
+                filter_and_format(resp.json())
+            else:
+                print(f"{BR}[!] Connection Interrupted:{R}{RED} API returned status code {resp.status_code}{R}")
     except Exception as e:
-        print(f"\n{Fore.RED}[-] Connection Error: {str(e)}{Style.RESET_ALL}")
-        
-    input(f"\n{Fore.MAGENTA}[Press Enter to return to menu...]{Style.RESET_ALL}")
+        print(f"{BR}[!] Fatal Error:{R}{RED} {e}{R}")
+
+def show_help():
+    print(f"\n{BR} ┌── MoonWitch Documentation {R}")
+    print(f"{BR} │ {R}")
+    print(f"{BR} ├─ {W}[01] Phone Number Lookup{R}: Enter target 10-digit mobile number.")
+    print(f"{BR} ├─ {W}[02] UPI Lookup         {R}: Enter valid UPI ID (e.g., target@bank).")
+    print(f"{BR} ├─ {W}[03] Vehicle Lookup     {R}: Enter target vehicle registration.")
+    print(f"{BR} ├─ {W}[04] TG Username Lookup {R}: Enter Telegram username (without @).")
+    print(f"{BR} ├─ {W}[05] Aadhaar Lookup     {R}: Enter 12-digit Aadhaar number.")
+    print(f"{BR} ├─ {W}[00] Exit System        {R}: Safely terminate connection.")
+    print(f"{BR} │ {R}")
+    print(f"{BR} ├─ {W}If you don't have an API, contact on Telegram:{R}")
+    print(f"{BR} ├─ {W}https://t.me/moonwitchservices{R}")
+    print(f"{BR} └── ───────────────────────────────────────────────────────{R}\n")
 
 def main():
+    display_ui()
     while True:
-        clear_screen()
-        print_banner()
-        print_menu()
-        
-        
-        choice = input(f"{Fore.MAGENTA}┌──(admin@moonwitch)-[C:\\MoonWitch-Tools]\n└──${Style.RESET_ALL} ").strip()
-
-        if choice == '01':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter Phone Number to search: ")
-            query_api("lookup/phone", "number", target)
-        elif choice == '02':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter UPI ID to search: ")
-            query_api("lookup/upi", "vpa", target)
-        elif choice == '03':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter Vehicle Registration to search: ")
-            query_api("lookup/vehicle", "reg_no", target)
-        elif choice == '04':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter IP Address to search: ")
-            query_api("lookup/ip", "address", target)
-        elif choice == '05':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter Telegram Username to search: ")
-            query_api("lookup/telegram", "username", target)
-        elif choice == '06':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter Instagram Handle to search: ")
-            query_api("lookup/instagram", "handle", target)
-        elif choice == '07':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter Aadhaar Number to search: ")
-            query_api("lookup/aadhaar", "uid", target)
-        elif choice == '08':
-            target = input(f"{Fore.MAGENTA}[?]{Style.RESET_ALL} Enter PAN Number to search: ")
-            query_api("lookup/pan", "pan_no", target)
+        prompt_str = f"{RED}┌──(admin@moonwitch)─[C:\\MoonWitch-Tools]\n└──${R} "
+        try:
+            choice = input(prompt_str).strip()
+        except KeyboardInterrupt:
+            print(f"\n{RED}[*] Force quitting...{R}")
+            sys.exit()
+            
+        if choice in ["00", "0"]:
+            print(f"{RED}[*] Shutting down systems...{R}")
+            sys.exit()
+            
         elif choice.lower() == 'h':
-            print(f"\n{Fore.MAGENTA}[Help]{Style.RESET_ALL} Select a number from the menu to perform a lookup. Configure your API keys in the source code.")
-            input("\nPress Enter to continue...")
+            show_help()
         elif choice.lower() == 'v':
-            print(f"\n{Fore.MAGENTA}MoonWitch v1.1.0{Style.RESET_ALL} (Purple Edition)")
-            input("\nPress Enter to continue...")
-        elif choice in ['00', 'exit', 'quit']:
-            print(f"\n{Fore.MAGENTA}[!] Exiting MoonWitch...{Style.RESET_ALL}")
-            sys.exit(0)
+            print(f"\n{BR}[*] MoonWitch Terminal Version:{R} {W}v2{R}\n")
+        elif choice.lower() == 'c':
+            print(f"\n{BR}[*] Official Contact:{R} {W}https://t.me/moonwitchservices{R}\n")
+            
+        elif choice in API_MAP or (choice.startswith('0') and choice in API_MAP):
+            key = choice if len(choice) == 2 else f"0{choice}"
+            if key in API_MAP:
+                api_info = API_MAP[key]
+                query = input(f"\n{BR}[?]{R}{RED} Enter target for {api_info[0]}: {R}").strip()
+                run_lookup(api_info[1], query)
         else:
-            print(f"\n{Fore.RED}[-] Invalid option.{Style.RESET_ALL}")
-            import time
-            time.sleep(1)
+            if choice != "":
+                print(f"{BR}[!]{R}{RED} Invalid command sequence. Type 'H' for help.{R}")
 
 if __name__ == "__main__":
-    try:
-        main()
-    except KeyboardInterrupt:
-        print(f"\n\n{Fore.MAGENTA}[!] Session Terminated by User.{Style.RESET_ALL}")
-        sys.exit(0)
+    main()
